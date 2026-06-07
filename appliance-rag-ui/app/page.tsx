@@ -528,10 +528,12 @@ export default function Home() {
                   </p>
                   <div className="flex flex-wrap gap-2 justify-center mt-3">
                     {[
-                      "What does error code E3 mean?",
-                      "What is the maintenance schedule?",
-                      "What are the safety requirements?",
-                      "What temperature is required for process X?",
+                      "Give me a 3-sentence summary of this document",
+                      "What are the most important takeaways?",
+                      "Explain the key terms used in this document",
+                      "What questions does this document answer?",
+                      "Compare the main topics covered in different sections",
+                      "List any step-by-step instructions mentioned",
                     ].map((q) => (
                       <button
                         key={q}
