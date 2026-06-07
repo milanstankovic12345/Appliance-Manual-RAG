@@ -1,0 +1,18 @@
+[Unit]
+Description=Appliance Manual RAG — FastAPI backend
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+User=rag
+WorkingDirectory=/opt/appliance-rag
+EnvironmentFile=/opt/appliance-rag/.env
+ExecStart=/opt/appliance-rag/venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/appliance-rag/logs/backend.log
+StandardError=append:/opt/appliance-rag/logs/backend.log
+
+[Install]
+WantedBy=multi-user.target

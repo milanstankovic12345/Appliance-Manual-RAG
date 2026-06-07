@@ -1,0 +1,24 @@
+# Local env
+.env
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Runtime
+documents/*
+!documents/.gitkeep
+storage/
+logs/
+*.log
+
+# Node
+node_modules/
+.next/
+out/
+.DS_Store

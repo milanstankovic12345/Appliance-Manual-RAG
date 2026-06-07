@@ -1,0 +1,19 @@
+[Unit]
+Description=Appliance Manual RAG — Next.js frontend
+After=network.target appliance-rag-backend.service
+
+[Service]
+Type=simple
+User=rag
+WorkingDirectory=/opt/appliance-rag/appliance-rag-ui
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+Environment=NEXT_PUBLIC_API_URL=
+ExecStart=/opt/appliance-rag/appliance-rag-ui/node_modules/.bin/next start --port 3000
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/appliance-rag/logs/frontend.log
+StandardError=append:/opt/appliance-rag/logs/frontend.log
+
+[Install]
+WantedBy=multi-user.target
