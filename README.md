@@ -11,26 +11,32 @@ A local Retrieval-Augmented Generation (RAG) application that allows you to uplo
 ## How to Use
 
 ### 1. Prerequisites
-- **Ollama**: Download and install [Ollama](https://ollama.com). Launch the app and make sure the tray icon is active.
-- **System Requirements**: Minimum 8 GB RAM (16 GB recommended) and ~8 GB free disk space (to store the local LLM and embedding models).
+- **Windows 10** (version 1803 or later)
+- **Internet connection** for the first-time setup (~500 MB download)
+- **8 GB RAM** minimum (16 GB recommended)
+- **~10 GB free disk space** (for runtimes, models, and dependencies)
 
-### 2. Start the Application
-Double-click the launcher script for your operating system:
-- **Windows**: Run [start.bat](file:///d:/projekti/Appliance-Manual-RAG/start.bat)
-- **macOS**: Run [start.command](file:///d:/projekti/Appliance-Manual-RAG/start.command)
-- **Linux**: Run [start.sh](file:///d:/projekti/Appliance-Manual-RAG/start.sh) (make executable first: `chmod +x start.sh`)
+### 2. Install (one-time)
+Double-click **[install.bat](file:///d:/projekti/Appliance-Manual-RAG/install.bat)** and wait for it to finish. This automatically downloads and sets up:
+- Python 3.12 (portable — no system install needed)
+- Node.js 20 (portable — no system install needed)
+- Ollama (AI model runtime)
+- All backend and frontend packages
+- AI models (hermes3 + nomic-embed-text)
 
-On the first run, the launcher will:
-1. Verify Ollama is running.
-2. Pull the required models (`hermes3` and `nomic-embed-text`).
-3. Set up a Python virtual environment and install backend requirements.
-4. Install frontend JavaScript dependencies.
-5. Start both servers in the background.
-6. Open your browser to the web interface at `http://localhost:3000`.
+> **No manual installation of Python, Node.js, or Ollama is required.** The installer handles everything.
 
-*Subsequent launches will be much faster as dependencies and models are already downloaded.*
+### 3. Start the Application
+Double-click **[start.bat](file:///d:/projekti/Appliance-Manual-RAG/start.bat)** to launch. It will:
+1. Start the Ollama AI server (if not already running).
+2. Start the backend and frontend servers.
+3. Open your browser to `http://localhost:3000`.
 
-### 3. Usage Steps
+On **macOS/Linux**, use [start.command](file:///d:/projekti/Appliance-Manual-RAG/start.command) or [start.sh](file:///d:/projekti/Appliance-Manual-RAG/start.sh) (these still require manually installed Python, Node.js, and Ollama).
+
+*Subsequent launches are fast — all dependencies are cached locally.*
+
+### 4. Usage Steps
 1. **Upload manuals**: In the left sidebar, click **Upload File** and select your manual. Wait for the "indexed" checkmark.
 2. **Ask questions**: Type your question in the chat box at the bottom and press Enter.
 3. **Verify answers**: Look at the source cards below the AI response to see exact page citations. Click them to view highlighted text excerpts.

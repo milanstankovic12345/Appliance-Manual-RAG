@@ -1,27 +1,21 @@
 @echo off
 REM ============================================================================
-REM  Appliance Manual RAG — Windows launcher
+REM  Appliance Manual RAG — Windows Launcher
+REM
+REM  Uses the local runtimes installed by install.bat.
 REM  Double-click this file in Explorer to start the app.
 REM ============================================================================
 
 setlocal EnableDelayedExpansion
 cd /d "%~dp0"
+title Appliance Manual RAG
 
-set "BOLD=1"
-set "DIM=2"
-set "RED=31"
-set "GRN=32"
-set "YEL=33"
-set "CYN=36"
-set "RST=0"
+REM ── Paths to local runtimes ───────────────────────────────────────────────────
+set "RUNTIME=%~dp0_runtime"
+set "PY_DIR=%RUNTIME%\python"
+set "NODE_DIR=%RUNTIME%\node"
 
-REM ── ANSI color support for Windows 10+ ──────────────────────────────────────
-for /F "tokens=*" %%i in ('echo prompt $E ^| cmd') do set "ESC=%%i"
-
-call :color %CYN% & echo.===^> %BOLD%Appliance Manual RAG - Windows launcher%RST% & call :color %RST%
-echo.
-
-REM ── Read .env (best-effort) ─────────────────────────────────────────────────
+REM ── Read .env (best-effort) ──────────────────────────────────────────────────
 set "OLLAMA_LLM_MODEL=hermes3"
 set "OLLAMA_EMBED_MODEL=nomic-embed-text"
 set "BACKEND_PORT=8000"
@@ -35,129 +29,257 @@ if exist ".env" (
     )
 )
 
-REM ── 1. Check Ollama ──────────────────────────────────────────────────────────
-call :color %CYN% & echo.===^> Checking Ollama...%RST% & call :color %RST%
+REM ── Banner ────────────────────────────────────────────────────────────────────
+echo.
+echo  ============================================================
+echo         Appliance Manual RAG — Starting...
+echo  ============================================================
+echo.
+
+REM ── Resolve Python ────────────────────────────────────────────────────────────
+REM  Priority: local embedded Python ^> system venv ^> system Python
+set "PYTHON_EXE="
+if exist "%PY_DIR%\python.exe" (
+    set "PYTHON_EXE=%PY_DIR%\python.exe"
+    set "PY_SOURCE=local runtime"
+) else if exist "venv\Scripts\python.exe" (
+    call venv\Scripts\activate.bat
+    set "PYTHON_EXE=python"
+    set "PY_SOURCE=venv"
+) else (
+    where python >nul 2>&1
+    if not errorlevel 1 (
+        set "PYTHON_EXE=python"
+        set "PY_SOURCE=system PATH"
+    )
+)
+if not defined PYTHON_EXE (
+    echo  [X] Python not found.
+    echo.
+    echo  Run install.bat first to set up all dependencies.
+    echo.
+    pause
+    exit /b 1
+)
+echo  [OK] Python (%PY_SOURCE%)
+
+REM ── Resolve Node.js ───────────────────────────────────────────────────────────
+REM  Priority: local portable Node ^> system Node
+set "NODE_EXE="
+set "NPM_CMD="
+if exist "%NODE_DIR%\node.exe" (
+    set "NODE_EXE=%NODE_DIR%\node.exe"
+    set "NPM_CMD=%NODE_DIR%\npm.cmd"
+    set "PATH=%NODE_DIR%;%PATH%"
+    set "NODE_SOURCE=local runtime"
+) else (
+    where node >nul 2>&1
+    if not errorlevel 1 (
+        set "NODE_EXE=node"
+        set "NPM_CMD=npm"
+        set "NODE_SOURCE=system PATH"
+    )
+)
+if not defined NODE_EXE (
+    echo  [X] Node.js not found.
+    echo.
+    echo  Run install.bat first to set up all dependencies.
+    echo.
+    pause
+    exit /b 1
+)
+echo  [OK] Node.js (%NODE_SOURCE%)
+
+REM ── Resolve Ollama ────────────────────────────────────────────────────────────
+set "OLLAMA_EXE="
 where ollama >nul 2>&1
-if errorlevel 1 (
-    call :color %RED% & echo.X Ollama is not installed. & call :color %RST%
-    echo Please install it from https://ollama.com/download and run this file again.
+if not errorlevel 1 (
+    for /f "tokens=*" %%i in ('where ollama 2^>nul') do (
+        if not defined OLLAMA_EXE set "OLLAMA_EXE=%%i"
+    )
+)
+if not defined OLLAMA_EXE (
+    if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" (
+        set "OLLAMA_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+    )
+)
+if not defined OLLAMA_EXE (
+    echo  [X] Ollama not found.
+    echo.
+    echo  Run install.bat first, or install Ollama from https://ollama.com/download
+    echo.
     pause
     exit /b 1
 )
-call :color %GRN% & echo.OK Ollama found & call :color %RST%
+echo  [OK] Ollama found
 
-curl -fsS -m 3 http://127.0.0.1:11434/api/tags >nul 2>&1
-if errorlevel 1 (
-    call :color %YEL% & echo.! Ollama server not responding. Start the Ollama app and try again. & call :color %RST%
-    pause
-    exit /b 1
-)
-call :color %GRN% & echo.OK Ollama is running & call :color %RST%
-
-REM ── 2. Pull models if missing ───────────────────────────────────────────────
-call :pull_model "%OLLAMA_LLM_MODEL%"
-call :pull_model "%OLLAMA_EMBED_MODEL%"
-
-REM ── 3. Python venv + requirements ───────────────────────────────────────────
-call :color %CYN% & echo.===^> Checking Python...%RST% & call :color %RST%
-where python >nul 2>&1
-if errorlevel 1 (
-    call :color %RED% & echo.X Python not found. Install Python 3.10+ from https://www.python.org/downloads/ & call :color %RST%
-    pause
-    exit /b 1
-)
-for /F "tokens=2" %%V in ('python --version 2^>^&1') do set "PYVER=%%V"
-call :color %GRN% & echo.OK Python !PYVER! & call :color %RST%
-
-if not exist "venv\Scripts\python.exe" (
-    call :color %CYN% & echo.===^> Creating venv...%RST% & call :color %RST%
-    python -m venv venv || ( call :color %RED% & echo.X venv creation failed & call :color %RST% & pause & exit /b 1 )
-)
-call venv\Scripts\activate.bat
-python -m pip install --quiet --upgrade pip
-call :color %CYN% & echo.===^> Installing Python dependencies [one-time]...%RST% & call :color %RST%
-pip install --quiet -r requirements.txt || ( call :color %RED% & echo.X pip install failed & call :color %RST% & pause & exit /b 1 )
-call :color %GRN% & echo.OK Python deps ready & call :color %RST%
-
-REM ── 4. Node deps ────────────────────────────────────────────────────────────
-call :color %CYN% & echo.===^> Checking Node.js...%RST% & call :color %RST%
-where node >nul 2>&1
-if errorlevel 1 (
-    call :color %RED% & echo.X Node.js not found. Install Node 18+ from https://nodejs.org/ & call :color %RST%
-    pause
-    exit /b 1
-)
-for /F "tokens=*" %%V in ('node --version') do set "NODEVER=%%V"
-call :color %GRN% & echo.OK Node !NODEVER! & call :color %RST%
-
+REM ── Ensure frontend deps are installed ────────────────────────────────────────
 if not exist "appliance-rag-ui\node_modules" (
-    call :color %CYN% & echo.===^> Installing frontend dependencies [one-time]...%RST% & call :color %RST%
+    echo.
+    echo  [i] Frontend packages not installed. Running npm install...
     pushd appliance-rag-ui
-    call npm install --no-audit --no-fund --loglevel=error || ( popd & call :color %RED% & echo.X npm install failed & call :color %RST% & pause & exit /b 1 )
+    call "%NPM_CMD%" install --no-audit --no-fund --loglevel=error
+    if !errorlevel! neq 0 (
+        popd
+        echo  [X] npm install failed.
+        pause
+        exit /b 1
+    )
     popd
+    echo  [OK] Frontend packages installed.
 )
-call :color %GRN% & echo.OK Frontend deps ready & call :color %RST%
 
-REM ── 5. Start backend in a new window ─────────────────────────────────────────
+REM ── Ensure Python deps are installed ──────────────────────────────────────────
+REM  Quick check: see if uvicorn is importable
+"%PYTHON_EXE%" -c "import uvicorn" 2>nul
+if errorlevel 1 (
+    echo.
+    echo  [i] Python packages not installed. Running pip install...
+    "%PYTHON_EXE%" -m pip install --quiet --no-warn-script-location -r requirements.txt
+    if !errorlevel! neq 0 (
+        echo  [X] pip install failed.
+        pause
+        exit /b 1
+    )
+    echo  [OK] Python packages installed.
+)
+
+REM ── Start Ollama if not running ───────────────────────────────────────────────
+echo.
+echo  [..] Checking Ollama server...
+curl.exe -fsS -m 3 http://127.0.0.1:11434/api/tags >nul 2>&1
+if not errorlevel 1 goto :ollama_up
+
+echo  [i] Ollama not running. Starting it now...
+start "Ollama-Serve" /MIN cmd /c ""%OLLAMA_EXE%" serve"
+
+set "WAIT=0"
+:wait_ollama
+if !WAIT! geq 30 (
+    echo  [X] Ollama did not start within 30 seconds.
+    echo      Make sure nothing else is using port 11434.
+    pause
+    exit /b 1
+)
+curl.exe -fsS -m 2 http://127.0.0.1:11434/api/tags >nul 2>&1
+if not errorlevel 1 goto :ollama_up
+set /a WAIT+=1
+timeout /t 1 /nobreak >nul
+goto :wait_ollama
+
+:ollama_up
+echo  [OK] Ollama is running
+
+REM ── Pull models if missing ────────────────────────────────────────────────────
+echo.
+echo  [..] Checking AI models...
+call :check_and_pull "%OLLAMA_LLM_MODEL%"
+call :check_and_pull "%OLLAMA_EMBED_MODEL%"
+
+REM ── Create log directory ──────────────────────────────────────────────────────
 if not exist logs mkdir logs
-call :color %CYN% & echo.===^> Starting backend on port %BACKEND_PORT%...%RST% & call :color %RST%
-start "RAG-Backend" /B cmd /c "call venv\Scripts\activate && python -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT% > logs\backend.log 2>&1"
 
-REM ── 6. Start frontend in a new window ────────────────────────────────────────
-call :color %CYN% & echo.===^> Starting frontend on port %FRONTEND_PORT%...%RST% & call :color %RST%
+REM ── Start backend ─────────────────────────────────────────────────────────────
+echo.
+echo  [..] Starting backend on port %BACKEND_PORT%...
+start "RAG-Backend" /B cmd /c ""%PYTHON_EXE%" -m uvicorn main:app --host 0.0.0.0 --port %BACKEND_PORT% > logs\backend.log 2>&1"
+
+REM ── Start frontend ────────────────────────────────────────────────────────────
+echo  [..] Starting frontend on port %FRONTEND_PORT%...
 pushd appliance-rag-ui
-start "RAG-Frontend" /B cmd /c "npm run dev -- --port %FRONTEND_PORT% > ..\logs\frontend.log 2>&1"
+start "RAG-Frontend" /B cmd /c ""%NPM_CMD%" run dev -- --port %FRONTEND_PORT% > ..\logs\frontend.log 2>&1"
 popd
 
-REM ── 7. Wait for both to be ready ────────────────────────────────────────────
-call :color %CYN% & echo.===^> Waiting for backend...%RST% & call :color %RST%
+REM ── Wait for both servers ─────────────────────────────────────────────────────
+echo.
+echo  [..] Waiting for backend to start...
 call :wait_url "http://127.0.0.1:%BACKEND_PORT%/health" 60
-call :color %CYN% & echo.===^> Waiting for frontend...%RST% & call :color %RST%
-call :wait_url "http://127.0.0.1:%FRONTEND_PORT%" 90
+if !errorlevel! neq 0 (
+    echo  [X] Backend did not start. Check logs\backend.log for errors.
+    pause
+    exit /b 1
+)
 
-REM ── 8. Open browser ─────────────────────────────────────────────────────────
-call :color %GRN% & echo.
-echo.OK App is running!
-echo.    Backend:  http://127.0.0.1:%BACKEND_PORT%
-echo.    Frontend: http://localhost:%FRONTEND_PORT% & call :color %RST%
+echo  [..] Waiting for frontend to start...
+call :wait_url "http://127.0.0.1:%FRONTEND_PORT%" 90
+if !errorlevel! neq 0 (
+    echo  [X] Frontend did not start. Check logs\frontend.log for errors.
+    pause
+    exit /b 1
+)
+
+REM ── Open browser ──────────────────────────────────────────────────────────────
+echo.
+echo  ============================================================
+echo.
+echo   App is running!
+echo.
+echo     Backend:  http://127.0.0.1:%BACKEND_PORT%
+echo     Frontend: http://localhost:%FRONTEND_PORT%
+echo.
+echo   Press any key in this window to STOP the app.
+echo.
+echo  ============================================================
 start "" "http://localhost:%FRONTEND_PORT%"
 
+pause >nul
+
+REM ── Cleanup: kill background processes ────────────────────────────────────────
 echo.
-echo Close the "RAG-Backend" and "RAG-Frontend" windows to stop the app.
-pause
+echo  Stopping servers...
+taskkill /FI "WINDOWTITLE eq RAG-Backend*" /F >nul 2>&1
+taskkill /FI "WINDOWTITLE eq RAG-Frontend*" /F >nul 2>&1
+
+REM Also kill by process if the above didn't catch them
+for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":%BACKEND_PORT% " ^| findstr "LISTENING"') do (
+    taskkill /PID %%p /F >nul 2>&1
+)
+for /f "tokens=5" %%p in ('netstat -aon 2^>nul ^| findstr ":%FRONTEND_PORT% " ^| findstr "LISTENING"') do (
+    taskkill /PID %%p /F >nul 2>&1
+)
+
+echo  Stopped. You can close this window.
+timeout /t 3 >nul
 exit /b 0
 
-REM ─────────────────────────────────────────────────────────────────────────────
+REM ═══════════════════════════════════════════════════════════════════════════════
 REM  Helpers
-REM ─────────────────────────────────────────────────────────────────────────────
-:color
-if "%~1"=="" ( <nul set /p "=%ESC%[0m" ) else ( <nul set /p "=%ESC%[%~1m" )
-goto :eof
+REM ═══════════════════════════════════════════════════════════════════════════════
 
-:pull_model
+:check_and_pull
+REM Usage: call :check_and_pull "model-name"
 set "MODEL=%~1"
-call :color %CYN% & echo.===^> Ensuring model '%MODEL%' is pulled...%RST% & call :color %RST%
-curl -fsS -m 3 http://127.0.0.1:11434/api/tags | findstr /C:"\"name\":\"%MODEL%\"" >nul 2>&1
+REM Try to detect if the model is already present via Ollama API
+curl.exe -fsS http://127.0.0.1:11434/api/tags 2>nul | findstr /I "%MODEL%" >nul 2>&1
 if not errorlevel 1 (
-    call :color %GRN% & echo.OK Model '%MODEL%' present & call :color %RST%
+    echo  [OK] Model '%MODEL%' is available
     goto :eof
 )
-echo Downloading %MODEL% - this can take a few minutes on first run...
-ollama pull "%MODEL%" || ( call :color %RED% & echo.X Pull failed & call :color %RST% & pause & exit /b 1 )
-call :color %GRN% & echo.OK Model '%MODEL%' pulled & call :color %RST%
+echo  [i] Pulling '%MODEL%' (this may take several minutes on first run)...
+"%OLLAMA_EXE%" pull "%MODEL%"
+if errorlevel 1 (
+    echo  [!] Failed to pull '%MODEL%'. The app may not work correctly.
+    echo      Try manually: ollama pull %MODEL%
+) else (
+    echo  [OK] Model '%MODEL%' pulled successfully
+)
 goto :eof
 
 :wait_url
+REM Usage: call :wait_url "http://..." timeout_seconds
+REM Returns errorlevel 0 on success, 1 on timeout
 set "URL=%~1"
 set "MAX=%~2"
-for /L %%I in (1,1,%MAX%) do (
-    curl -fsS -m 2 -o nul "%URL%" >nul 2>&1
-    if not errorlevel 1 (
-        call :color %GRN% & echo.OK %URL% is up & call :color %RST%
-        goto :eof
-    )
-    timeout /t 1 /nobreak >nul
+set "W=0"
+:wait_url_loop
+if !W! geq %MAX% (
+    exit /b 1
 )
-call :color %RED% & echo.X %URL% did not become ready in %MAX%s. Check the log windows. & call :color %RST%
-pause
-exit /b 1
+curl.exe -fsS -m 2 -o nul "%URL%" >nul 2>&1
+if not errorlevel 1 (
+    echo  [OK] %URL% is up
+    exit /b 0
+)
+set /a W+=1
+timeout /t 1 /nobreak >nul
+goto :wait_url_loop

@@ -2,6 +2,9 @@
 .env
 *.local
 
+# Local runtimes (installed by install.bat)
+_runtime/
+
 # Python
 __pycache__/
 *.py[cod]
