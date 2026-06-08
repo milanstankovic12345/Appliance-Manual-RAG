@@ -117,7 +117,7 @@ if exist "%PY_DIR%\python.exe" (
     )
     echo         Extracting ...
     if not exist "%PY_DIR%" mkdir "%PY_DIR%"
-    powershell -NoProfile -Command "Expand-Archive -LiteralPath '%RUNTIME%\python.zip' -DestinationPath '%PY_DIR%' -Force"
+    tar.exe -xf "%RUNTIME%\python.zip" -C "%PY_DIR%"
     if !errorlevel! neq 0 (
         echo  FAILED: Could not extract Python archive.
         pause
@@ -191,9 +191,15 @@ if exist "%NODE_DIR%\node.exe" (
         exit /b 1
     )
     echo         Extracting ...
-    powershell -NoProfile -Command ^
-        "Expand-Archive -LiteralPath '%RUNTIME%\node.zip' -DestinationPath '%RUNTIME%' -Force; " ^
-        "if (Test-Path '%RUNTIME%\node-v%NODE_VERSION%-win-x64') { Rename-Item '%RUNTIME%\node-v%NODE_VERSION%-win-x64' 'node' -Force }"
+    tar.exe -xf "%RUNTIME%\node.zip" -C "%RUNTIME%"
+    if !errorlevel! neq 0 (
+        echo  FAILED: Could not extract Node.js archive.
+        pause
+        exit /b 1
+    )
+    if exist "%RUNTIME%\node-v%NODE_VERSION%-win-x64" (
+        move /Y "%RUNTIME%\node-v%NODE_VERSION%-win-x64" "%NODE_DIR%" >nul
+    )
     if !errorlevel! neq 0 (
         echo  FAILED: Could not extract Node.js archive.
         pause

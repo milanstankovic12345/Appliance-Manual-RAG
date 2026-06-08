@@ -76,7 +76,7 @@ if exist "%NODE_DIR%\node.exe" (
     where node >nul 2>&1
     if not errorlevel 1 (
         set "NODE_EXE=node"
-        set "NPM_CMD=npm"
+        set "NPM_CMD=npm.cmd"
         set "NODE_SOURCE=system PATH"
     )
 )
@@ -275,7 +275,7 @@ set "W=0"
 if !W! geq %MAX% (
     exit /b 1
 )
-curl.exe -fsS -m 2 -o nul "%URL%" >nul 2>&1
+curl.exe -sS -m 2 -o nul "%URL%" >nul 2>&1
 if not errorlevel 1 (
     echo  [OK] %URL% is up
     exit /b 0
