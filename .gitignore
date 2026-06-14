@@ -2,9 +2,6 @@
 .env
 *.local
 
-# Local runtimes (installed by install.bat)
-_runtime/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -12,16 +9,19 @@ __pycache__/
 venv/
 .venv/
 env/
+backend/venv/
 
-# Runtime
-documents/*
-!documents/.gitkeep
-storage/
-logs/
+# Data and Runtime
+data/documents/*
+!data/documents/.gitkeep
+data/storage/
+data/logs/
 *.log
 
 # Node
 node_modules/
 .next/
 out/
+
+# OS
 .DS_Store
